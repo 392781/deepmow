@@ -1,4 +1,4 @@
-name: mario
+name: lawnmower
 channels:
   - defaults
 dependencies:
@@ -32,4 +32,4 @@ dependencies:
     - torch==1.5.0
     - torchvision==0.6.0
     - tqdm==4.46.0
-prefix: /opt/anaconda3/envs/mario
+prefix: /opt/anaconda3/envs/lawnmower
