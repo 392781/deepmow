@@ -22,6 +22,7 @@ dependencies:
     - future==0.18.2
     - gym==0.17.2
     - gym-super-mario-bros==7.3.0
+    - gym_video_streamer
     - nes-py==8.1.1
     - numpy==1.18.4
     - opencv-python==4.2.0.34
