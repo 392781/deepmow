@@ -1,0 +1,12 @@
+{
+  "info": {
+    "DONE": {
+      "address": 178,
+      "type": "|u1"
+    },
+    "GAME_FUEL": {
+      "address": 203,
+      "type": "|u1"
+    }
+  }
+}
