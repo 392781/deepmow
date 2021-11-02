@@ -7,6 +7,10 @@
     "GAME_FUEL": {
       "address": 203,
       "type": "|u1"
+    },
+    "DIR": {
+      "address": 230,
+      "type": "|u1"
     }
   }
 }

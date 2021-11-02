@@ -1,6 +1,7 @@
 import retro
 import os
 from nes_py.wrappers import JoypadSpace
+from pathlib import Path
 
 import torch
 from torch import nn
@@ -34,7 +35,7 @@ class Hank:
         self.state_dim = state_dim
         self.action_dim = action_dim
         self.save_dir = save_dir
-        self.memory = deque(maxlen=100)
+        self.memory = deque(maxlen=5000)
         self.batch_size = 32
         self.gamma = 0.9
 
@@ -343,20 +344,23 @@ env = retro.make(game="lawnmower",
 
 env = JoypadSpace(
     env,
-    [['right', 'A', 'start'],
-     ['left', 'A', 'start'],
-     ['up', 'A', 'start'],
-     ['down', 'A', 'start']]
+    [
+    #  ['right', 'A', 'start'],
+     ['left']#, 'A', 'start'],
+    #  ['up', 'A', 'start'],
+    #  ['down', 'A', 'start']
+    ]
 )
 
 obs = env.reset()
 
 # Apply Wrappers to environment
 
-env = GrayScaleObservation(env, keep_dim=False)
-env = ResizeObservation(env, shape=84)
+env = SkipFrame(env, skip=12)
+# env = GrayScaleObservation(env, keep_dim=False)
+#env = ResizeObservation(env, shape=84)
 env = TransformObservation(env, f=lambda x: x / 255.)
-env = FrameStack(env, num_stack=4)
+# env = FrameStack(env, num_stack=4)
 
 env.reset()
 
@@ -386,7 +390,7 @@ for e in range(episodes):
 
         # Agent performs action
         next_state, reward, done, info = env.step(action)
-
+        
         # Remember
         hank.cache(state, next_state, action, reward, done)
 

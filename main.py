@@ -15,10 +15,10 @@ from agent import Mario
 from wrappers import ResizeObservation, SkipFrame
 
 # Initialize Super Mario environment
-# env = gym_super_mario_bros.make('SuperMarioBros-1-1-v0')
-env = retro.make(game="lawnmower", 
-    state='lawnmower.lawn1.state', \
-    inttype=retro.data.Integrations.ALL)
+env = gym_super_mario_bros.make('SuperMarioBros-1-1-v0')
+# env = retro.make(game="lawnmower", 
+#     state='lawnmower.lawn1.state', \
+#     inttype=retro.data.Integrations.ALL)
 
 # Limit the action-space to
 #   0. walk right
@@ -26,7 +26,7 @@ env = retro.make(game="lawnmower",
 env = JoypadSpace(
     env,
     [['right'],
-#    ['left']]
+     #['left'],
     # ['up'],
     # ['down']]
     ['right', 'A']]
@@ -36,18 +36,17 @@ env = JoypadSpace(
 
 env = SkipFrame(env, skip=4)
 env = GrayScaleObservation(env, keep_dim=False)
-env = ResizeObservation(env, shape=84)
+# env = ResizeObservation(env, shape=84)
 env = TransformObservation(env, f=lambda x: x / 255.)
 env = FrameStack(env, num_stack=4)
-env = VideoStreamer(env)
 
 env.reset()
 
 save_dir = Path('checkpoints') / datetime.datetime.now().strftime('%Y-%m-%dT%H-%M-%S')
 save_dir.mkdir(parents=True)
 
-checkpoint = None # Path('checkpoints/2020-10-21T18-25-27/mario.chkpt')
-mario = Mario(state_dim=(4, 84, 84), action_dim=env.action_space.n, save_dir=save_dir, checkpoint=checkpoint)
+#checkpoint = Path('./trained_mario.chkpt')
+mario = Mario(state_dim=(4, 84, 84), action_dim=env.action_space.n, save_dir=save_dir)#, checkpoint=checkpoint)
 
 logger = MetricLogger(save_dir)
 
@@ -66,7 +65,6 @@ for e in range(episodes):
 
         # 4. Run agent on the state
         action = mario.act(state)
-        print(action)
 
         # 5. Agent performs action
         next_state, reward, done, info = env.step(action)
@@ -82,7 +80,7 @@ for e in range(episodes):
 
         # 9. Update state
         state = next_state
-
+        print(f'{next_state.shape},\n {reward},\n {done},\n {info}')
         # 10. Check if end of game
         if done or info['flag_get']:
             break
