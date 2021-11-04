@@ -3,3 +3,4 @@
 *.npy
 videos/
 .idea/
+*.code-workspace
