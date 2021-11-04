@@ -16,12 +16,6 @@
     "variables": {
       "DONE": {
         "reward": 1.0
-      },
-      "GAME_FUEL": {
-        "measurement": "absolute",
-        "op": "less-or-equal",
-        "penalty": 50.0,
-        "reference": 110
       }
     }
   }

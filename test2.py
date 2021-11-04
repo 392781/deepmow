@@ -14,6 +14,8 @@ import random, datetime, os, copy
 
 from gym.wrappers import FrameStack, GrayScaleObservation, TransformObservation
 
+from discretizer import LawnDiscretizer
+
 #from metrics import MetricLogger
 #from agent import Mario
 from wrappers import ResizeObservation, SkipFrame
@@ -31,11 +33,11 @@ print("lawnmower" in retro.data.list_games(inttype=retro.data.Integrations.ALL))
 
 
 class Hank:
-    def __init__(self, state_dim, action_dim, save_dir):
+    def __init__(self, state_dim, action_dim, save_dir, checkpoint=None):
         self.state_dim = state_dim
         self.action_dim = action_dim
         self.save_dir = save_dir
-        self.memory = deque(maxlen=5000)
+        self.memory = deque(maxlen=10000)
         self.batch_size = 32
         self.gamma = 0.9
 
@@ -46,8 +48,11 @@ class Hank:
 
         self.use_cuda = torch.cuda.is_available()
 
+
         # Hank's DNN to predict the most optimal action - we implement this in the Learn section
         self.net = HankNet(self.state_dim, self.action_dim).double()
+        if checkpoint:
+            self.load(checkpoint)
         if self.use_cuda:
             self.net = self.net.to(device="cuda")
         self.optimizer = torch.optim.Adam(self.net.parameters(), lr=0.00025)
@@ -146,6 +151,18 @@ class Hank:
             save_path,
         )
         print(f"HankNet saved to {save_path} at step {self.curr_step}")
+
+    def load(self, load_path):
+        if not load_path.exists():
+            raise ValueError(f"{load_path} does not exist")
+
+        ckp = torch.load(load_path, map_location=('cuda' if self.use_cuda else 'cpu'))
+        exploration_rate = ckp.get('exploration_rate')
+        state_dict = ckp.get('model')
+
+        print(f"Loading model at {load_path} with exploration rate {exploration_rate}")
+        self.net.load_state_dict(state_dict)
+        self.exploration_rate = exploration_rate
 
     def learn(self):
         if self.curr_step % self.sync_every == 0:
@@ -339,28 +356,30 @@ class HankNet(nn.Module):
 
 env = retro.make(game="lawnmower",
                  state='lawnmower.lawn1.state', \
-                 inttype=retro.data.Integrations.ALL, \
-                 use_restricted_actions=retro.Actions.DISCRETE)
+                 inttype=retro.data.Integrations.ALL)
 
-env = JoypadSpace(
-    env,
-    [
-    #  ['right', 'A', 'start'],
-     ['left']#, 'A', 'start'],
-    #  ['up', 'A', 'start'],
-    #  ['down', 'A', 'start']
-    ]
-)
+env = LawnDiscretizer(env)
+
+
+# env = JoypadSpace(
+#     env,
+#     [
+#     #  ['right', 'A', 'start'],
+#      ['left']#, 'A', 'start'],
+#     #  ['up', 'A', 'start'],
+#     #  ['down', 'A', 'start']
+#     ]
+# )
 
 obs = env.reset()
 
 # Apply Wrappers to environment
 
-env = SkipFrame(env, skip=12)
-# env = GrayScaleObservation(env, keep_dim=False)
-#env = ResizeObservation(env, shape=84)
+#env = SkipFrame(env, skip=100)
+env = GrayScaleObservation(env, keep_dim=False)
+env = ResizeObservation(env, shape=84)
 env = TransformObservation(env, f=lambda x: x / 255.)
-# env = FrameStack(env, num_stack=4)
+env = FrameStack(env, num_stack=4)
 
 env.reset()
 
@@ -372,25 +391,63 @@ print()
 
 save_dir = Path("checkpoints") / datetime.datetime.now().strftime("%Y-%m-%dT%H-%M-%S")
 save_dir.mkdir(parents=True)
-
-hank = Hank(state_dim=(4, 84, 84), action_dim=env.action_space.n, save_dir=save_dir)
+checkpoint = Path('checkpoints\\2021-11-04T00-10-01\\Hank_net_0.chkpt')
+hank = Hank(state_dim=(4, 84, 84), action_dim=env.action_space.n, save_dir=save_dir, checkpoint=checkpoint)
 
 logger = MetricLogger(save_dir)
+
+
 
 episodes = 1000
 for e in range(episodes):
 
     state = env.reset()
+    frame_count = 0
 
     # Play the game!
+    fuel_pickups = 0
+    turns = 0
+    prev_info = None
+    info = None
+
     while True:
+        frame_count += 1
+        cur_fuel_pickup = 0
+        fuel_rew = 0
 
         # Run agent on the state
         action = hank.act(state)
 
+        # Store Previous Info
+
+        prev_info = info
+
+
         # Agent performs action
         next_state, reward, done, info = env.step(action)
-        
+
+        if prev_info is not None:
+            if info["GAME_FUEL"] > prev_info["GAME_FUEL"] and frame_count > 65:
+                fuel_pickups += 1
+                cur_fuel_pickup = 1
+                fuel_rew = cur_fuel_pickup*100*(1-1/(1+np.exp(-frame_count/600)))
+                print(f"Frame: {frame_count}, Reward: {fuel_rew}")
+            if info["DIR"] != prev_info["DIR"]:
+                turns += 1
+            else:
+                turns = 0
+
+
+
+        # Penalizes for turning too much
+        reward -= (turns-1)*turns/1000
+
+        # Reward for fuel pickup
+        reward += fuel_rew
+
+        # Penalizes for taking too long
+        reward -= frame_count/100000
+
         # Remember
         hank.cache(state, next_state, action, reward, done)
 
@@ -413,11 +470,12 @@ for e in range(episodes):
             break
 
     logger.log_episode()
-
-
-    # if e % 20 == 0:
-    #     logger.record(episode=e, epsilon=hank.exploration_rate, step=hank.curr_step)
     logger.record(episode=e, epsilon=hank.exploration_rate, step=hank.curr_step)
+
+
+    if e % 10 == 0:
+        hank.save()
+
 
 
 
