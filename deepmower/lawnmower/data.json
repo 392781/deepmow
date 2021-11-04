@@ -1,0 +1,20 @@
+{
+  "info": {
+    "DONE": {
+      "address": 178,
+      "type": "|u1"
+    },
+    "GAME_FUEL": {
+      "address": 203,
+      "type": "|u1"
+    },
+    "DIR": {
+      "address": 230,
+      "type": "|u1"
+    },
+    "CAM_X": {
+      "address": 213,
+      "type": "|u1"
+    }
+  }
+}

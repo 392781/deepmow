@@ -1,0 +1,22 @@
+{
+  "crop": [
+    8,
+    40,
+    224, 
+    177
+  ],
+  "done": {
+    "variables": {
+      "GAME_FUEL": {
+        "op": "zero"
+      }
+    }
+  },
+  "reward": {
+    "variables": {
+      "DONE": {
+        "reward": 1.0
+      }
+    }
+  }
+}
