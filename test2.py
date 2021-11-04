@@ -391,14 +391,14 @@ print()
 
 save_dir = Path("checkpoints") / datetime.datetime.now().strftime("%Y-%m-%dT%H-%M-%S")
 save_dir.mkdir(parents=True)
-checkpoint = Path('checkpoints\\2021-11-04T00-10-01\\Hank_net_0.chkpt')
+checkpoint = Path('checkpoints\\2021-11-04T00-25-17\\Hank_net_1.chkpt')
 hank = Hank(state_dim=(4, 84, 84), action_dim=env.action_space.n, save_dir=save_dir, checkpoint=checkpoint)
 
 logger = MetricLogger(save_dir)
 
 
 
-episodes = 1000
+episodes = 100000
 for e in range(episodes):
 
     state = env.reset()
