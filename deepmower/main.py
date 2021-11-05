@@ -36,7 +36,7 @@ env = ResizeObservation(env, shape=84)
 env = GrayScaleObservation(env, keep_dim=False)
 env = TransformObservation(env, f=lambda x: x / 255.)
 env = FrameStack(env, num_stack=4)
-env = SkipFrame(env, skip=2)
+env = SkipFrame(env, skip=1)
 
 ### CHECK NVIDIA CUDA AVAILABILITY
 
@@ -60,14 +60,14 @@ debug = True
 
 episodes = 100000
 
-best_reward = 0
+best_propane_points = 0
 
 for e in range(episodes):
     # State reset between runs
     state = env.reset()
 
     # Variables to keep track of for reward function
-    frame_count: int = 0
+    frame_count = 0
     fuel_pickups = 0
     turns = 0
 
@@ -77,12 +77,15 @@ for e in range(episodes):
     info = None
 
     rewrd = 0
+    propane_points = 0
+
 
     # Episode training
     while True:
         frame_count += 1
         cur_fuel_pickup = 0
         fuel_rew = 0
+        rewrd = 0
 
         # Run agent on the state
         action = hank.act(state)
@@ -143,10 +146,12 @@ for e in range(episodes):
         # Render frame
         env.render()
 
+        propane_points += rewrd
+
         # Check if end condition is reached
         if done or info["GAME_FUEL"] == 0:
-            if rewrd >= best_reward:
-                best_reward = rewrd
+            if propane_points >= best_propane_points:
+                best_propane_points = propane_points
                 new_best = True
                 print(f"~~~ NEW BEST!  Good job, Hank!  Top Propane Points = {best_reward}")
             break
