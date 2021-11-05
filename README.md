@@ -7,3 +7,21 @@
     </br>
 </p>
 
+1. Install conda environment:
+
+```bash 
+conda env create -f environment.yml
+```
+
+2. Activate conda environment:
+
+```bash
+conda activate deepmower
+```
+
+3. Run training:
+
+```bash
+cd deepmower
+python main.py
+```
