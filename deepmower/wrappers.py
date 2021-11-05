@@ -1,6 +1,7 @@
 import gym
 import numpy as np
-from skimage import transform
+import cv2 
+#from skimage import transform
 from gym.spaces import Box
 
 class ResizeObservation(gym.ObservationWrapper):
@@ -15,7 +16,8 @@ class ResizeObservation(gym.ObservationWrapper):
         self.observation_space = Box(low=0, high=255, shape=obs_shape, dtype=np.uint8)
 
     def observation(self, observation):
-        resize_obs = transform.resize(observation, self.shape)
+        #resize_obs = transform.resize(observation, self.shape)
+        resize_obs = cv2.resize(observation, self.shape)
         # cast float back to uint8
         resize_obs *= 255
         resize_obs = resize_obs.astype(np.uint8)

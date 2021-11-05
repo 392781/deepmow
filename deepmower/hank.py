@@ -1,6 +1,5 @@
 import torch
 import random, numpy as np
-from pathlib import Path
 from neural import NeuralNet
 from collections import deque
 
@@ -19,7 +18,6 @@ class Hank:
         self.sync_every = 1e4  # no. of experiences between Q_target & Q_online sync
 
         self.use_cuda = torch.cuda.is_available()
-
 
         # Hank's DNN to predict the most optimal action - we implement this in the Learn section
         self.net = NeuralNet(self.state_dim, self.action_dim).double()
