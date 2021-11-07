@@ -1,20 +1,60 @@
 {
   "info": {
-    "DONE": {
-      "address": 178,
-      "type": "|u1"
-    },
-    "GAME_FUEL": {
-      "address": 203,
-      "type": "|u1"
-    },
-    "DIR": {
-      "address": 230,
-      "type": "|u1"
-    },
     "CAM_X": {
       "address": 213,
-      "type": "|u1"
+      "type": "=u2"
+    },
+    "DONE": {
+      "address": 178,
+      "type": "=u1"
+    },
+    "DIRECTION": {
+      "address": 230,
+      "type": "=u1"
+    },
+    "DIRECTION_PREV": {
+      "address": 197,
+      "type": "=u1"
+    },
+    "FRAME_COUNTER_5": {
+      "address": 254,
+      "type": "=u1"
+    },
+    "FUEL": {
+      "address": 203,
+      "type": "=u1"
+    },
+    "FUEL_TIME": {
+      "address": 188,
+      "type": "=u2"
+    },
+    "FUEL_X": {
+      "address": 193,
+      "type": "=u1"
+    },
+    "FUEL_Y": {
+      "address": 192,
+      "type": "=u1"
+    },
+    "FUEL_X_NEXT": {
+      "address": 184,
+      "type": "=u1"
+    },
+    "FUEL_Y_NEXT": {
+      "address": 183,
+      "type": "=u1"
+    },
+    "PAD_STATE": {
+      "address": 247,
+      "type": "=u1"
+    },
+    "PLAYER_X": {
+      "address": 216,
+      "type": "=u1"
+    },
+    "PLAYER_Y": {
+      "address": 215,
+      "type": "=u1"
     }
   }
 }
