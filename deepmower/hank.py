@@ -31,9 +31,12 @@ class Hank:
         self.curr_step = 0
 
         self.save_every = 5e4  # no. of experiences between saving Hank Net
-
+        
         if checkpoint:
-            self.load(checkpoint)
+            try:
+                self.load(checkpoint)
+            except:
+                print(f"{checkpoint} not found! Initializing Hank anyway...")
 
     def act(self, state):
         """
