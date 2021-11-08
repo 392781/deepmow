@@ -47,8 +47,8 @@ print(f"Using CUDA: {use_cuda}\n")
 
 save_dir = Path("../checkpoints") / datetime.datetime.now().strftime("%Y-%m-%dT%H-%M-%S")
 save_dir.mkdir(parents=True)
-#checkpoint = Path('..\\checkpoints\\2021-11-05T00-18-09\Hank_net_0.chkpt')
-hank = Hank(state_dim=(4, 84, 84), action_dim=env.action_space.n, save_dir=save_dir)#, checkpoint=checkpoint)
+checkpoint = Path('..\\\checkpoints\\2021-11-08T01-18-45\\Hank_net_0.chkpt')
+hank = Hank(state_dim=(4, 84, 84), action_dim=env.action_space.n, save_dir=save_dir, checkpoint=checkpoint)
 
 ### LOGGING
 
@@ -73,34 +73,64 @@ for e in range(episodes):
 
     new_best = False
 
-    prev_info = None
-    info = None
 
     rewrd = 0
     propane_points = 0
+
+    act = 0
+    learn = 0
+    delay_act = 0
+
+    # initial action, during fuel loading
+    action = hank.act(state)
+    next_state, reward, done, info = env.step(action)
+    prev_info = info
+
+    game_start = 0
+
+    frame_since_act = 0
 
 
     # Episode training
     while True:
         frame_count += 1
+        frame_since_act += 1
         cur_fuel_pickup = 0
         fuel_rew = 0
         rewrd = 0
 
-        # Run agent on the state
-        action = hank.act(state)
+        if game_start == 0 and info["FUEL_TIME"] < 254:
+            game_start = 1
+
+        # equals 1 if action blocked, 0 if possible
+        act_5fr = (prev_info["FRAME_COUNTER_5"] == 3)
+
+        # Run agent on the state if action is possible
+        if ((act == 1 and act_5fr == 0) or delay_act == 1) and game_start == 1:
+            action = hank.act(state)
+            frame_since_act = 0
+            learn = 1  # hank should learn if he acted
+            act = 0 # if acted, then acting should not occur on next frame
+            delay_act = 0
+
+
+
+        if act == 1 and act_5fr == 1:
+            delay_act = 1
+
+
 
         # Agent performs action
         next_state, reward, done, info = env.step(action)
 
         # reward function information
         if prev_info is not None:
-            if info["GAME_FUEL"] > prev_info["GAME_FUEL"] and frame_count > 65:
+            if info["FUEL"] > prev_info["FUEL"] and frame_count > 65:
                 fuel_pickups += 1
                 cur_fuel_pickup = 1
                 fuel_rew = cur_fuel_pickup * 100 * (1 - 1 / (1 + np.exp(-frame_count / 600)))
                 print(f"Frame: {frame_count}, reward: {fuel_rew}")
-            if info["DIR"] != prev_info["DIR"]:
+            if info["DIRECTION"] != prev_info["DIRECTION"]:
                 turns += 1
             else:
                 turns = 0
@@ -116,8 +146,18 @@ for e in range(episodes):
         # Penalizes for taking too long
         rewrd -= frame_count / 100000
 
-        # Remember
-        hank.cache(state, next_state, action, rewrd, done)
+        # Hank should only learn if he acted
+        if learn == 1:
+            learn = 0  # set for next episode
+            hank.cache(state, next_state, action, rewrd, done)
+
+            # Learn
+            q, loss = hank.learn()
+
+            # Logging
+            logger.log_step(rewrd, loss, q)
+
+
 
         if debug is True:
             if e > 0:
@@ -131,11 +171,7 @@ for e in range(episodes):
                 #print("~~~")
                 #print("~~~")
 
-        # Learn
-        q, loss = hank.learn()
 
-        # Logging
-        logger.log_step(rewrd, loss, q)
 
         # Update state
         state = next_state
@@ -148,12 +184,18 @@ for e in range(episodes):
 
         propane_points += rewrd
 
+        # by default, no action on next possible frame
+
+
+        if prev_info["PLAYER_X"] != info["PLAYER_X"] or prev_info["PLAYER_Y"] != info["PLAYER_Y"] or frame_since_act > 5:
+            act = 1
+
         # Check if end condition is reached
-        if done or info["GAME_FUEL"] == 0:
+        if done or info["FUEL"] == 0:
             if propane_points >= best_propane_points:
                 best_propane_points = propane_points
                 new_best = True
-                print(f"~~~ NEW BEST!  Good job, Hank!  Top Propane Points = {best_reward}")
+                print(f"~~~ NEW BEST!  Good job, Hank!  Top Propane Points = {best_propane_points}")
             break
 
 

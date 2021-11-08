@@ -25,11 +25,12 @@ class Hank:
             self.net = self.net.to(device="cuda")
         self.optimizer = torch.optim.Adam(self.net.parameters(), lr=0.00025)
         self.exploration_rate = 1
-        self.exploration_rate_decay = 0.99999975
+        #self.exploration_rate_decay = 0.99999975
+        self.exploration_rate_decay = 0.9999975
         self.exploration_rate_min = 0.1
         self.curr_step = 0
 
-        self.save_every = 5e5  # no. of experiences between saving Hank Net
+        self.save_every = 5e4  # no. of experiences between saving Hank Net
 
         if checkpoint:
             self.load(checkpoint)
