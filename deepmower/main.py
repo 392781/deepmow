@@ -16,7 +16,7 @@ retro.data.Integrations.add_custom_path(LAWNMOWER_LOCATION)
 
 try:
     env = retro.make(game='lawnmower',
-                     state='lawnmower.lawn1.state', \
+                     state='lawn1.state',
                      inttype=retro.data.Integrations.ALL)
 except FileNotFoundError:
     print(f"ERROR: lawnmower integration directory not found in the following location: {LAWNMOWER_LOCATION}")
@@ -36,7 +36,7 @@ env = ResizeObservation(env, shape=84)
 env = GrayScaleObservation(env, keep_dim=False)
 env = TransformObservation(env, f=lambda x: x / 255.)
 env = FrameStack(env, num_stack=4)
-env = SkipFrame(env, skip=1)
+# env = SkipFrame(env, skip=1)
 
 ### CHECK NVIDIA CUDA AVAILABILITY
 
@@ -200,7 +200,7 @@ for e in range(episodes):
 
 
 
-    logger.log_episode()
+        logger.log_episode()
 
     if e % 10 == 0:
         hank.save()
