@@ -8,6 +8,10 @@
       "address": 178,
       "type": "=u1"
     },
+    "DONE_CNT": {
+      "address": 204,
+      "type": "=u2"
+    },
     "DIRECTION": {
       "address": 230,
       "type": "=u1"

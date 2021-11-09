@@ -7,6 +7,9 @@
   ],
   "done": {
     "variables": {
+      "DONE_CNT": {
+        "op": "zero"
+      },
       "FUEL": {
         "op": "zero"
       }
