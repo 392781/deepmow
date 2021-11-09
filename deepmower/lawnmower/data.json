@@ -4,13 +4,9 @@
       "address": 213,
       "type": "=u2"
     },
-    "DONE": {
+    "DONE_%": {
       "address": 178,
       "type": "=u1"
-    },
-    "DONE_CNT": {
-      "address": 204,
-      "type": "=u2"
     },
     "DIRECTION": {
       "address": 230,
@@ -48,6 +44,10 @@
       "address": 183,
       "type": "=u1"
     },
+    "GRASS_LEFT": {
+      "address": 204,
+      "type": "=u2"
+    },
     "PAD_STATE": {
       "address": 247,
       "type": "=u1"
@@ -58,10 +58,6 @@
     },
     "PLAYER_Y": {
       "address": 215,
-      "type": "=u1"
-    },
-    "GRASS_LEFT": {
-      "address": 204,
       "type": "=u1"
     }
   }
