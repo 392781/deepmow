@@ -14,9 +14,12 @@ retro.data.Integrations.add_custom_path(LAWNMOWER_LOCATION)
 
 ### START ENVIRONMENT
 
+lawn = 1
+save_state = 'lawn' + str(lawn) + '.state'
+
 try:
     env = retro.make(game='lawnmower',
-                     state='lawn1.state',
+                     state=save_state,
                      inttype=retro.data.Integrations.ALL)
 except FileNotFoundError:
     print(f"ERROR: lawnmower integration directory not found in the following location: {LAWNMOWER_LOCATION}")
@@ -47,8 +50,12 @@ print(f"Using CUDA: {use_cuda}\n")
 
 save_dir = Path("../checkpoints") / datetime.datetime.now().strftime("%Y-%m-%dT%H-%M-%S")
 save_dir.mkdir(parents=True)
-checkpoint = Path('..\\\checkpoints\\2021-11-08T01-18-45\\Hank_net_0.chkpt')
+checkpoint = Path('..\\checkpoints\\2021-11-09T02-35-21\\Hank_net_2.chkpt')
 hank = Hank(state_dim=(4, 84, 84), action_dim=env.action_space.n, save_dir=save_dir, checkpoint=checkpoint)
+
+### Set these if you want it to begin learning anew with the current nn
+#hank.exploration_rate = 1
+#hank.exploration_rate_decay = 0.99999975
 
 ### LOGGING
 
@@ -63,7 +70,11 @@ episodes = 100000
 best_propane_points = 0
 
 for e in range(episodes):
+
+    curr_lawn = 1
+
     # State reset between runs
+    env.load_state(save_state, inttype=retro.data.Integrations.ALL)
     state = env.reset()
 
     # Variables to keep track of for reward function
@@ -73,13 +84,12 @@ for e in range(episodes):
 
     new_best = False
 
-
-    rewrd = 0
     propane_points = 0
 
     act = 0
     learn = 0
     delay_act = 0
+    frames_since_OOF = 0
 
     # initial action, during fuel loading
     action = hank.act(state)
@@ -90,6 +100,8 @@ for e in range(episodes):
 
     frame_since_act = 0
 
+    rewrd = 0
+
 
     # Episode training
     while True:
@@ -97,7 +109,7 @@ for e in range(episodes):
         frame_since_act += 1
         cur_fuel_pickup = 0
         fuel_rew = 0
-        rewrd = 0
+
 
         if game_start == 0 and info["FUEL_TIME"] < 254:
             game_start = 1
@@ -129,7 +141,8 @@ for e in range(episodes):
                 fuel_pickups += 1
                 cur_fuel_pickup = 1
                 fuel_rew = cur_fuel_pickup * 100 * (1 - 1 / (1 + np.exp(-frame_count / 600)))
-                print(f"Frame: {frame_count}, reward: {fuel_rew}")
+                frames_since_OOF = 0
+                #print(f"Frame: {frame_count}, reward: {fuel_rew}")
             if info["DIRECTION"] != prev_info["DIRECTION"]:
                 turns += 1
             else:
@@ -157,8 +170,6 @@ for e in range(episodes):
             # Logging
             logger.log_step(rewrd, loss, q)
 
-
-
         if debug is True:
             if e > 0:
                 pass
@@ -171,8 +182,6 @@ for e in range(episodes):
                 #print("~~~")
                 #print("~~~")
 
-
-
         # Update state
         state = next_state
 
@@ -182,7 +191,7 @@ for e in range(episodes):
         # Render frame
         env.render()
 
-        propane_points += rewrd
+        propane_points = rewrd  # might be unnecessary now, just use rewrd
 
         # by default, no action on next possible frame
 
@@ -190,14 +199,25 @@ for e in range(episodes):
         if prev_info["PLAYER_X"] != info["PLAYER_X"] or prev_info["PLAYER_Y"] != info["PLAYER_Y"] or frame_since_act > 5:
             act = 1
 
-        # Check if end condition is reached
-        if done or info["FUEL"] == 0:
+        # Hacky way to handle OOF'ing
+        if info["FUEL"] == 0:
+            frames_since_OOF += 1
+
+        # Check if OOF
+        if frames_since_OOF > 3:
+            if propane_points < best_propane_points:
+                print(f"Run {e} - Propane Points = {round(propane_points,1)}  ||  Top Propane Points = {round(best_propane_points,1)}")
             if propane_points >= best_propane_points:
                 best_propane_points = propane_points
                 new_best = True
-                print(f"~~~ NEW BEST!  Good job, Hank!  Top Propane Points = {best_propane_points}")
+                print(f"Run {e} ~~~ NEW BEST!  Good job, Hank!  New Top Propane Points = {round(best_propane_points,1)}")
             break
 
+        if info["GRASS_LEFT"] < 1:
+            curr_lawn += 1
+            save_state = 'lawn' + str(curr_lawn) + '.state'
+            env.load_state(save_state, inttype = retro.data.Integrations.ALL)
+            env.reset()
 
 
         logger.log_episode()

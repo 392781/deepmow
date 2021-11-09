@@ -55,6 +55,10 @@
     "PLAYER_Y": {
       "address": 215,
       "type": "=u1"
+    },
+    "GRASS_LEFT": {
+      "address": 204,
+      "type": "=u1"
     }
   }
 }
