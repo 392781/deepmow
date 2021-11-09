@@ -12,12 +12,12 @@ from hank import Hank
 LAWNMOWER_LOCATION = Path().parent.absolute()
 retro.data.Integrations.add_custom_path(LAWNMOWER_LOCATION)
 
-### CHECK NVIDIA CUDA AVAILABILITY
+""" CHECK NVIDIA CUDA AVAILABILITY """
 
 use_cuda = torch.cuda.is_available()
 print(f"Using CUDA: {use_cuda}\n")
 
-### START ENVIRONMENT
+""" START ENVIRONMENT """
 
 try:
     save_states = [f'lawn{x}.state' for x in range(10, 0, -1)]
@@ -28,7 +28,7 @@ except FileNotFoundError:
     print(f"ERROR: lawnmower integration directory not found in the following location: {LAWNMOWER_LOCATION}")
     sys.exit()
 
-### OBSERVATION WRAPPERS
+""" OBSERVATION WRAPPERS """
 
 action_space = [
     ['LEFT', 'B'],
@@ -43,7 +43,7 @@ env = GrayScaleObservation(env, keep_dim=False)
 env = TransformObservation(env, f=lambda x: x / 255.)
 env = FrameStack(env, num_stack=4)
 
-### CHECKPOINT SAVING
+""" CHECKPOINT SAVING """
 
 save_dir = Path("../checkpoints") / datetime.datetime.now().strftime("%Y-%m-%dT%H-%M-%S")
 save_dir.mkdir(parents=True)
@@ -54,11 +54,11 @@ hank = Hank(state_dim=(4, 84, 84), action_dim=env.action_space.n, save_dir=save_
 #hank.exploration_rate = 1
 #hank.exploration_rate_decay = 0.99999975
 
-### LOGGING
+""" LOGGING """
 
 logger = MetricLogger(save_dir)
 
-### BEGIN TRAINING
+""" BEGIN TRAINING """
 
 debug = True
 episodes = 100000
@@ -92,7 +92,7 @@ for e in range(episodes):
     # Episode training
     while True:
 
-        ### FRAME SENSITIVE CONDITIONS
+        """ FRAME SENSITIVE CONDITIONS """
 
         frame_count += 1
         frame_since_act += 1
@@ -126,7 +126,7 @@ for e in range(episodes):
         ):
             act = True
 
-        ### REWARD FUNCTION INFORMATION
+        """ REWARD FUNCTION INFORMATION """
 
         if prev_info is not None:
             if info["FUEL"] > prev_info["FUEL"]:
@@ -151,7 +151,7 @@ for e in range(episodes):
         # Penalizes for taking too long
         reward -= frame_count / 100000
 
-        ### STATE UPDATES
+        """ STATE UPDATES """
 
         # Hank should only learn if he acted
         if learn:
@@ -185,6 +185,8 @@ for e in range(episodes):
                 #print("~~~")
                 #print("~~~")
 
+        """ DONE CONDITIONS """
+
         # Hacky way to handle OOF'ing
         if info["FUEL"] == 0:
             frame_since_OOF += 1
@@ -200,6 +202,8 @@ for e in range(episodes):
             break
 
         logger.log_episode()
+
+    """ SAVING & CHANGING LAWNS"""
 
     if e % 10 == 0:
         hank.save()
