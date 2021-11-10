@@ -1,4 +1,4 @@
-# deepmower powered by Hank™
+# deepmow powered by Hank™
 
 <p align="center">
     <b> Work in progress... </b>
