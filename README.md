@@ -16,7 +16,7 @@ conda env create -f environment.yml
 2. Activate conda environment:
 
 ```bash
-conda activate deepmower
+conda activate deepmow
 ```
 
 3. Run training:
