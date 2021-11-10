@@ -12,20 +12,23 @@ from hank import Hank
 LAWNMOWER_LOCATION = Path().parent.absolute()
 retro.data.Integrations.add_custom_path(LAWNMOWER_LOCATION)
 
-### START ENVIRONMENT
+""" CHECK NVIDIA CUDA AVAILABILITY """
 
-lawn = 1
-save_state = 'lawn' + str(lawn) + '.state'
+use_cuda = torch.cuda.is_available()
+print(f"Using CUDA: {use_cuda}\n")
+
+""" START ENVIRONMENT """
 
 try:
+    save_states = [f'lawn{x}.state' for x in range(10, 0, -1)]
     env = retro.make(game='lawnmower',
-                     state=save_state,
+                     state=save_states.pop(), # pops off lawn1.state
                      inttype=retro.data.Integrations.ALL)
 except FileNotFoundError:
     print(f"ERROR: lawnmower integration directory not found in the following location: {LAWNMOWER_LOCATION}")
     sys.exit()
 
-### OBSERVATION WRAPPERS
+""" OBSERVATION WRAPPERS """
 
 action_space = [
     ['LEFT', 'B'],
@@ -39,14 +42,8 @@ env = ResizeObservation(env, shape=84)
 env = GrayScaleObservation(env, keep_dim=False)
 env = TransformObservation(env, f=lambda x: x / 255.)
 env = FrameStack(env, num_stack=4)
-# env = SkipFrame(env, skip=1)
 
-### CHECK NVIDIA CUDA AVAILABILITY
-
-use_cuda = torch.cuda.is_available()
-print(f"Using CUDA: {use_cuda}\n")
-
-### CHECKPOINT SAVING
+""" CHECKPOINT SAVING """
 
 save_dir = Path("../checkpoints") / datetime.datetime.now().strftime("%Y-%m-%dT%H-%M-%S")
 save_dir.mkdir(parents=True)
@@ -57,118 +54,124 @@ hank = Hank(state_dim=(4, 84, 84), action_dim=env.action_space.n, save_dir=save_
 #hank.exploration_rate = 1
 #hank.exploration_rate_decay = 0.99999975
 
-### LOGGING
+""" LOGGING """
 
 logger = MetricLogger(save_dir)
 
-### BEGIN TRAINING
+""" BEGIN TRAINING """
 
 debug = True
-
 episodes = 100000
-
-best_propane_points = 0
+best_reward = 0
 
 for e in range(episodes):
 
-    curr_lawn = 1
-
     # State reset between runs
-    env.load_state(save_state, inttype=retro.data.Integrations.ALL)
     state = env.reset()
 
     # Variables to keep track of for reward function
     frame_count = 0
+    frame_since_act = 0
+    frame_since_OOF = 0
     fuel_pickups = 0
     turns = 0
 
-    new_best = False
+    reward = 0
 
-    propane_points = 0
+    act = False
+    learn = False
+    delay_act = False
+    game_start = False
+    # new_best = False # not used
 
-    act = 0
-    learn = 0
-    delay_act = 0
-    frames_since_OOF = 0
-
-    # initial action, during fuel loading
+    # initial action
     action = hank.act(state)
-    next_state, reward, done, info = env.step(action)
+    next_state, _, done, info = env.step(action)
     prev_info = info
-
-    game_start = 0
-
-    frame_since_act = 0
-
-    rewrd = 0
-
 
     # Episode training
     while True:
+
+        """ FRAME SENSITIVE CONDITIONS """
+
         frame_count += 1
         frame_since_act += 1
-        cur_fuel_pickup = 0
+        # cur_fuel_pickup = 0
         fuel_rew = 0
 
+        if not game_start and info["FUEL_TIME"] < 254: # FUEL_TIME changes randomly
+            game_start = True
 
-        if game_start == 0 and info["FUEL_TIME"] < 254:
-            game_start = 1
-
-        # equals 1 if action blocked, 0 if possible
-        act_5fr = (prev_info["FRAME_COUNTER_5"] == 3)
+        # equals True if action blocked, False if possible
+        act_5fr = prev_info["FRAME_COUNTER_5"] == 3
 
         # Run agent on the state if action is possible
-        if ((act == 1 and act_5fr == 0) or delay_act == 1) and game_start == 1:
+        if ((act and act_5fr) or delay_act) and game_start:
             action = hank.act(state)
             frame_since_act = 0
-            learn = 1  # hank should learn if he acted
-            act = 0 # if acted, then acting should not occur on next frame
-            delay_act = 0
+            learn = True  # hank should learn if he acted
+            act = False # if acted, then acting should not occur on next frame
+            delay_act = False
 
-
-
-        if act == 1 and act_5fr == 1:
-            delay_act = 1
-
-
+        if act and act_5fr:
+            delay_act = True
 
         # Agent performs action
-        next_state, reward, done, info = env.step(action)
+        next_state, _, done, info = env.step(action)
 
-        # reward function information
+        # by default, no action on next possible frame
+        if (prev_info["PLAYER_X"] != info["PLAYER_X"] or 
+            prev_info["PLAYER_Y"] != info["PLAYER_Y"] or 
+            frame_since_act > 5
+        ):
+            act = True
+
+        """ REWARD FUNCTION INFORMATION """
+
         if prev_info is not None:
-            if info["FUEL"] > prev_info["FUEL"] and frame_count > 65:
+            if info["FUEL"] > prev_info["FUEL"]:
                 fuel_pickups += 1
-                cur_fuel_pickup = 1
-                fuel_rew = cur_fuel_pickup * 100 * (1 - 1 / (1 + np.exp(-frame_count / 600)))
-                frames_since_OOF = 0
+                # cur_fuel_pickup = 1
+                fuel_rew = 1 * 100 * (1 - 1 / (1 + np.exp(-frame_count / 600)))
+                frame_since_OOF = 0
                 #print(f"Frame: {frame_count}, reward: {fuel_rew}")
             if info["DIRECTION"] != prev_info["DIRECTION"]:
                 turns += 1
             else:
                 turns = 0
-            if info["DONE"] > prev_info["DONE"]:
-                rewrd += 1
+            if info["GRASS_LEFT"] < prev_info["GRASS_LEFT"]:
+                reward += 1
 
         # Penalizes for turning too much
-        rewrd -= (turns - 1) * turns / 1000
+        reward -= (turns - 1) * turns / 1000
 
         # reward for fuel pickup
-        rewrd += fuel_rew
+        reward += fuel_rew
 
         # Penalizes for taking too long
-        rewrd -= frame_count / 100000
+        reward -= frame_count / 100000
+
+        """ STATE UPDATES """
 
         # Hank should only learn if he acted
-        if learn == 1:
-            learn = 0  # set for next episode
-            hank.cache(state, next_state, action, rewrd, done)
+        if learn:
+            learn = False # set for next frame
+            hank.cache(state, next_state, action, reward, done)
 
             # Learn
             q, loss = hank.learn()
 
             # Logging
-            logger.log_step(rewrd, loss, q)
+            logger.log_step(reward, loss, q)
+
+        # Update state
+        state = next_state
+
+        # Store previous info
+        prev_info = info
+
+        # Render frame
+        env.render()
 
         if debug is True:
             if e > 0:
@@ -182,46 +185,33 @@ for e in range(episodes):
                 #print("~~~")
                 #print("~~~")
 
-        # Update state
-        state = next_state
-
-        # Store previous info
-        prev_info = info
-
-        # Render frame
-        env.render()
-
-        propane_points = rewrd  # might be unnecessary now, just use rewrd
-
-        # by default, no action on next possible frame
-
-
-        if prev_info["PLAYER_X"] != info["PLAYER_X"] or prev_info["PLAYER_Y"] != info["PLAYER_Y"] or frame_since_act > 5:
-            act = 1
+        """ DONE CONDITIONS """
 
         # Hacky way to handle OOF'ing
         if info["FUEL"] == 0:
-            frames_since_OOF += 1
+            frame_since_OOF += 1
 
         # Check if OOF
-        if frames_since_OOF > 3:
-            if propane_points < best_propane_points:
-                print(f"Run {e} - Propane Points = {round(propane_points,1)}  ||  Top Propane Points = {round(best_propane_points,1)}")
-            if propane_points >= best_propane_points:
-                best_propane_points = propane_points
-                new_best = True
-                print(f"Run {e} ~~~ NEW BEST!  Good job, Hank!  New Top Propane Points = {round(best_propane_points,1)}")
+        if frame_since_OOF > 3 or info["GRASS_LEFT"] < 1:
+            if reward < best_reward:
+                print(f"Run {e} - Propane Points = {round(reward,1)}  ||  Top Propane Points = {round(best_reward,1)}")
+            elif reward >= best_reward:
+                best_reward = reward
+                # new_best = True # not used
+                print(f"Run {e} ~~~ NEW BEST!  Good job, Hank!  New Top Propane Points = {round(best_reward,1)}")
             break
 
-        if info["GRASS_LEFT"] < 1:
-            curr_lawn += 1
-            save_state = 'lawn' + str(curr_lawn) + '.state'
-            env.load_state(save_state, inttype = retro.data.Integrations.ALL)
-            env.reset()
-
-
         logger.log_episode()
+
+    """ SAVING & CHANGING LAWNS"""
 
     if e % 10 == 0:
         hank.save()
         logger.record(episode=e, epsilon=hank.exploration_rate, step=hank.curr_step)
+
+    if info["GRASS_LEFT"] < 1 and save_states:
+        hank.save()
+        logger.record(episode=e, epsilon=hank.exploration_rate, step=hank.curr_step)
+        env.load_state(save_states.pop(), inttype = retro.data.Integrations.ALL)
+    elif not save_states:
+        sys.exit("HANK, YOU DID IT! YOU RAN THE GAUNTLET! LAWN 1-10 COMPLETE.")
