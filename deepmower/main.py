@@ -47,7 +47,7 @@ env = FrameStack(env, num_stack=4)
 
 save_dir = Path("../checkpoints") / datetime.datetime.now().strftime("%Y-%m-%dT%H-%M-%S")
 save_dir.mkdir(parents=True)
-checkpoint = Path('..\\\checkpoints\2021-11-10T22-13-01\Hank_net_13.chkpt')
+checkpoint = Path('..\\\checkpoints\\2021-11-10T22-13-01\\Hank_net_13.chkpt')
 hank = Hank(state_dim=(4, 84, 84), action_dim=env.action_space.n, save_dir=save_dir, checkpoint=checkpoint)
 
 ### Set these if you want it to begin learning anew with the current nn
