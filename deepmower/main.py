@@ -47,7 +47,7 @@ env = FrameStack(env, num_stack=4)
 
 save_dir = Path("../checkpoints") / datetime.datetime.now().strftime("%Y-%m-%dT%H-%M-%S")
 save_dir.mkdir(parents=True)
-checkpoint = Path('..\\checkpoints\\2021-11-09T02-35-21\\Hank_net_2.chkpt')
+checkpoint = Path('..\\\checkpoints\2021-11-10T22-13-01\Hank_net_13.chkpt')
 hank = Hank(state_dim=(4, 84, 84), action_dim=env.action_space.n, save_dir=save_dir, checkpoint=checkpoint)
 
 ### Set these if you want it to begin learning anew with the current nn
@@ -62,12 +62,12 @@ logger = MetricLogger(save_dir)
 
 debug = True
 episodes = 100000
-best_reward = 0
+best_propane_points = 0  # aka best_cumulative_reward
 
 for e in range(episodes):
 
     # State reset between runs
-    state = env.reset()
+    init_state = env.reset()
 
     # Variables to keep track of for reward function
     frame_count = 0
@@ -75,6 +75,7 @@ for e in range(episodes):
     frame_since_OOF = 0
     fuel_pickups = 0
     turns = 0
+    propane_points = 0  # aka cumulative_reward
 
     reward = 0
 
@@ -85,7 +86,8 @@ for e in range(episodes):
     # new_best = False # not used
 
     # initial action
-    action = hank.act(state)
+    action = hank.act(init_state)
+    action_state = init_state  # current state when action is performed
     next_state, _, done, info = env.step(action)
     prev_info = info
 
@@ -99,6 +101,7 @@ for e in range(episodes):
         # cur_fuel_pickup = 0
         fuel_rew = 0
 
+
         if not game_start and info["FUEL_TIME"] < 254: # FUEL_TIME changes randomly
             game_start = True
 
@@ -106,11 +109,26 @@ for e in range(episodes):
         act_5fr = prev_info["FRAME_COUNTER_5"] == 3
 
         # Run agent on the state if action is possible
-        if ((act and act_5fr) or delay_act) and game_start:
-            action = hank.act(state)
+        if ((act and not act_5fr) or delay_act) and game_start:
+            # Hank is about to act.  Learn from prior actions
+
+            hank.cache(action_state, next_state, action, reward, done)
+
+            # Learn
+            q, loss = hank.learn()
+            propane_points += reward
+
+            # Logging
+            logger.log_step(reward, loss, q)
+
+            reward = 0
+
+            # Perform new action
+            action = hank.act(next_state)
+            action_state = next_state  # current state when action is performed
             frame_since_act = 0
-            learn = True  # hank should learn if he acted
-            act = False # if acted, then acting should not occur on next frame
+
+            act = False  # if acted, then acting should not occur on next frame
             delay_act = False
 
         if act and act_5fr:
@@ -128,6 +146,8 @@ for e in range(episodes):
 
         """ REWARD FUNCTION INFORMATION """
 
+        ### TODO: clean up reward section
+
         if prev_info is not None:
             if info["FUEL"] > prev_info["FUEL"]:
                 fuel_pickups += 1
@@ -142,30 +162,25 @@ for e in range(episodes):
             if info["GRASS_LEFT"] < prev_info["GRASS_LEFT"]:
                 reward += 1
 
+            # Penalize for OOF'ing
+            if frame_since_OOF > 3:
+                reward -= 25
+
         # Penalizes for turning too much
-        reward -= (turns - 1) * turns / 1000
+        reward -= (turns - 1) * turns / 100
 
         # reward for fuel pickup
-        reward += fuel_rew
+        reward += fuel_rew  # I think this is way too massive right now
 
         # Penalizes for taking too long
-        reward -= frame_count / 100000
+        reward -= (frame_since_act + 1) / 100
 
         """ STATE UPDATES """
 
-        # Hank should only learn if he acted
-        if learn:
-            learn = False # set for next frame
-            hank.cache(state, next_state, action, reward, done)
 
-            # Learn
-            q, loss = hank.learn()
-
-            # Logging
-            logger.log_step(reward, loss, q)
 
         # Update state
-        state = next_state
+        # state = next_state  # irrelevant now?
 
         # Store previous info
         prev_info = info
@@ -193,15 +208,28 @@ for e in range(episodes):
 
         # Check if OOF
         if frame_since_OOF > 3 or info["GRASS_LEFT"] < 1:
-            if reward < best_reward:
-                print(f"Run {e} - Propane Points = {round(reward,1)}  ||  Top Propane Points = {round(best_reward,1)}")
-            elif reward >= best_reward:
-                best_reward = reward
+            if info["GRASS_LEFT"] < 1:
+                reward += 25  # maybe remove this?
+
+            # Learn from final actions
+            hank.cache(action_state, next_state, action, reward, done)
+
+            # Learn
+            q, loss = hank.learn()
+            propane_points += reward
+
+            # Logging
+            logger.log_step(reward, loss, q)
+
+            if propane_points < best_propane_points:
+                print(f"Run {e} - Propane Points = {round(propane_points,1)}  ||  Top Propane Points = {round(best_propane_points,1)}")
+            elif propane_points >= best_propane_points:
+                best_propane_points = propane_points
                 # new_best = True # not used
-                print(f"Run {e} ~~~ NEW BEST!  Good job, Hank!  New Top Propane Points = {round(best_reward,1)}")
+                print(f"Run {e} ~~~ NEW BEST!  Good job, Hank!  New Top Propane Points = {round(best_propane_points,1)}")
             break
 
-        logger.log_episode()
+    logger.log_episode()
 
     """ SAVING & CHANGING LAWNS"""
 
