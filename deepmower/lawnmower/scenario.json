@@ -1,20 +1,4 @@
 {
-  "crop": [
-    8,
-    40,
-    224, 
-    177
-  ],
-  "done": {
-    "variables": {
-      "GRASS_LEFT": {
-        "op": "zero"
-      },
-      "FUEL": {
-        "op": "zero"
-      }
-    }
-  },
   "reward": {
     "variables": {
       "DONE_%": {
